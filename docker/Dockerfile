@@ -2,8 +2,10 @@ FROM ubuntu:14.04
 
 MAINTAINER Barbara Hui <barbara.hui@ucop.edu>
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && \
+  apt-get install -y \
     apache2 \
+    curl \
     git \
     libapache2-mod-wsgi \
     libfreetype6 \
@@ -18,25 +20,23 @@ RUN apt-get update && apt-get install -y \
     python-dev \
     python-pip \
     python-setuptools \
-    zlib1g-dev 
-    
-RUN pip install \
+    zlib1g-dev && \
+  pip install \
     boto \
     configobj \
     mock \
     Pillow \
     requests \
     responses \
-    werkzeug
+    werkzeug && \
+  # have to do this to get rid of "ImportError: No module named _winreg" error for six.py
+  pip install --upgrade six && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
 
-# have to do this to get rid of "ImportError: No module named _winreg" error for six.py
-RUN pip install --upgrade six
+ENV PATH $PATH:/opt/loris/bin/Linux/x86_64
+ENV LD_LIBRARY_PATH /opt/loris/lib/Linux/x86_64
 
-# install Loris
-WORKDIR /opt
-RUN git clone https://github.com/barbarahui/loris.git
-WORKDIR /opt/loris
-RUN git checkout ucldc 
 RUN useradd -d /var/www/loris2 -s /sbin/false loris
 
 # make image directories
@@ -45,11 +45,12 @@ RUN mkdir /usr/local/share/images/loris
 RUN chown loris:loris /usr/local/share/images
 RUN chown loris:loris /usr/local/share/images/loris
 
-# loris/setup.py should be doing this - not sure why it's broken
-RUN cp bin/Linux/x86_64/kdu_expand /usr/local/bin/ 
-RUN cp lib/Linux/x86_64/libkdu_v74R.so /usr/lib/
-
-RUN python /opt/loris/setup.py install
+# install Loris
+WORKDIR /opt
+RUN curl -s -L https://github.com/barbarahui/loris/archive/ucldc.tar.gz \
+  | tar zxf - --transform s/^loris-ucldc/loris/ && \
+  python /opt/loris/setup.py install && \
+  rm -rf /opt/loris/docker/ /opt/loris/tests/
 
 # set up apache
 RUN a2enmod headers expires
